@@ -1,0 +1,160 @@
+---
+title: "Homework 6 - Plotting"
+author: "Jodelle Joseph"
+date: "DATA 2401"
+output: html_document
+---
+
+
+Turn in link to your repository on Canvas. Make sure your name is on this document in the author spot.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) # dont forget to run this if you're working on the console! 
+```
+
+# Exploratory Plotting
+
+In this assignment, we are going to be making exploratory and explanatory plots using the `msleep` dataset
+
+```{r}
+glimpse(msleep)
+```
+
+
+1. First, say that you're told that you should consider the `brainwt` and `bodywt` on the log10 scale. Create new variables using `mutate` that are the `log10()` of those two variables.
+
+```{r}
+sleep_log <- msleep %>%
+  mutate(log_brainwt = log10(brainwt),log_bodywt = log10(bodywt))
+log_10_info <- sleep_log %>%
+  select(log_brainwt, log_bodywt)
+log_10_info
+```
+
+2. Let's start with a one variable plot, of a discrete (categorical) variable. I want to know the distribution of the variable `vore`, the diet type of the animals. 
+
+First, create a summary table using our dplyr tools: count how many animals are in each diet type. 
+
+```{r}
+diet_summary <- msleep %>%
+  count(vore)
+diet_summary
+```
+
+Next, create a bar plot of that variable. What does this tell you? What's the most common diet type? The least common? 
+
+These give you the same information, but in different ways! Which do you prefer? 
+
+
+```{r}
+ggplot(msleep, aes(x = vore)) +
+  geom_bar(fill = "blue", color = "black") + labs(title = "Vore Diet Type Variations", "Diet Type/Vore", y = "count")
+```
+
+
+3. Now, a one variable plot, of a continous variable. This `sleep_total` variable seems interesting. Let's see first how the overall distribution of the variable looks: use `geom_density()` to plot the emperical density of the variable. (hint: using the `fill = "some_color"` argument makes the density plots a little easier to read)
+
+```{r}
+ggplot(msleep, aes(x = sleep_total)) +
+  geom_density(fill = "skyblue", color = "darkblue")+
+  labs(title = "Total Sleep", x = "Total Sleep Hours", y = "Density")
+```
+
+4. A natural next question, using the two variables above is whether the distribution of the total sleep of the animals varies by diet. Create a graph to show this in some way. 
+
+```{r}
+ggplot(msleep, aes(x = sleep_total, fill = vore)) + 
+  geom_density(alpha = 0.5, color = "pink") + 
+  labs(title = "Total Sleep in Relation to Diet Type", x = "Total Sleep in Hours", y = "Density")
+```
+
+A little processing first.... We want to remove the entries that have NA for the diet types, and we want to use order, but we want to remove orders that have less than 5 members to them. This isn't always a good idea, but in this case we're looking at broad picture and distribution between the groups.  (Remember species, `genus`, family, `order`, class, phylum, kingdom, domain?)
+
+```{r}
+# look at the data, consider that we want to remove the NA and the small orders. 
+msleep %>% count(vore)
+msleep %>% count(order)
+
+# this graph is the scratch work I'd suggest doing to decide where to draw the cutoff 
+# msleep %>% count(order) %>% ggplot(aes(x = n)) + geom_histogram(binwidth = 1)
+
+filtered_sleep <- msleep %>%
+  filter(!is.na(vore)) %>%
+  group_by(order) %>%
+  filter(n() >= 5)
+
+```
+
+Use `add_count`, the mutate version of `count`, to get an additional column that contains the count of the order of that row. 
+```{r}
+msleep_data_ordervore <- msleep  %>%
+    filter(!is.na(vore))         %>%  # Only cases with data for diet
+    add_count(order)             %>%  # Find counts for each order, use ?add_count  for more info
+    filter(n >= 5)    
+
+msleep_data_ordervore <- filtered_sleep %>%
+  add_count(order, name = "order count")
+msleep_data_ordervore
+```
+
+Now, use this to make a plot about how the distribution of the total sleep of the animals varies by diet:
+
+```{r}
+ggplot(msleep_data_ordervore, aes(x = sleep_total, fill = vore)) +
+  geom_density(alpha = 0.5, color = "orange") +
+  labs(title =  "Total Sleep by Diet (Filtered)", x = "Total Sleep in Hours", y = "Density")
+```
+
+5. Two discrete/categorical variables: Let's look back at our diet bar graph. Using our new subsetted data, add in a second discrete variable, `order`, using `fill` to see if each of the diets have a different distribution of the orders. 
+
+```{r}
+ggplot(msleep_data_ordervore, aes(x = vore, fill = order)) +
+  geom_bar(color = "black") +
+  labs(title = "Orders by Diet (Vore)",
+       x = "Diet Type (vore)",
+       y = "Proportion")
+```
+
+Try again, but make it a "dodge" bar chart like we learned in the notes, and make another  "fill"ed one like we discussed.
+
+What would be the benefits of the fill/percentage graph? What are the drawbacks? 
+
+```{r}
+ggplot(msleep_data_ordervore, aes(x = vore, fill = order)) +
+  geom_bar(position = "dodge", color = "black") +
+  labs(title = "Orders by Diet (Dodge)",
+       x = "Diet Type (vore)",
+       y = "Count")
+## The fill/percentage graph is easier to compare the proportions and shows more clearly how the orders relate to each diet type. Drawbacks could be possible clutter of data and not a good representation of proportions like the first graph.
+```
+
+6. Two continuous variables: Let's finally look at those log10 weights! Still using our new msleep_data_ordervore, make a scatter plot with `log10_brainwt` on the x axis and `log10_bodywt` on the y axis. 
+
+```{r}
+ggplot(sleep_log, aes(x = log_brainwt, y = log_bodywt)) +
+  geom_point(color = "black") +
+  labs(title = "Log Brain Weight v. Log Body Weight", x = "Log Brain Weight in kg", y = "Log Body Weight in kg")
+
+```
+
+
+7. Add in categorical variables: make the shape encode the `order` of the animals, and the color encode their diet (`vore`). What can you now see about the herbivores? 
+
+```{r}
+ggplot(sleep_log, aes(x = log_brainwt, y = log_bodywt, shape = order, color = vore)) +
+  geom_point() +
+  labs(shape = "Order", color = "Diet Type (Vore)") 
+  
+## Herbivores have higher log body weight and log brain weight then the other orders with carnivore and omnivore diet types 
+```
+
+8. Give this plot a title, and rename the axes appropriately. 
+
+```{r}
+ggplot(sleep_log, aes(x = log_brainwt, y = log_bodywt, shape = order, color = vore)) +
+  geom_point() +
+  labs(title = "Log Brain Weight v. Log Body Weight", x = "Log Brain Weight in kg", y = "Log Body Weight in kg", shape = "Order", color = "Diet Type (Vore)")
+ 
+
+```
